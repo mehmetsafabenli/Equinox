@@ -1,0 +1,7 @@
+{
+  "culture": "en",
+  "texts": {
+    "DisplayName:Eqn.Localization.DefaultLanguage": "Default language",
+    "Description:Eqn.Localization.DefaultLanguage": "The default language of the application."
+  }
+}

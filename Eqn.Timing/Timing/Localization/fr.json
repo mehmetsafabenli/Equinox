@@ -1,0 +1,7 @@
+{
+ "culture": "fr",
+ "texts": {
+  "DisplayName:Eqn.Timing.Timezone": "Fuseau horaire",
+  "Description:Eqn.Timing.Timezone": "Fuseau horaire de l'application"
+ }
+}

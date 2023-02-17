@@ -1,0 +1,7 @@
+{
+  "culture": "en",
+  "texts": {
+    "DisplayName:Eqn.Timing.Timezone": "Timezone",
+    "Description:Eqn.Timing.Timezone": "Application time zone"
+  }
+}

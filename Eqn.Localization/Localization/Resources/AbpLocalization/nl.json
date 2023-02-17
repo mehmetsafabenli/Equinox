@@ -1,0 +1,7 @@
+{
+  "culture": "nl",
+  "texts": {
+    "DisplayName:Eqn.Localization.DefaultLanguage": "Standaard taal",
+    "Description:Eqn.Localization.DefaultLanguage": "De standaardtaal van de applicatie."
+  }
+}
