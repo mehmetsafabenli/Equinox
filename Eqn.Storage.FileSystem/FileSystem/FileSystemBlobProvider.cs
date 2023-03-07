@@ -58,16 +58,16 @@ public class FileSystemBlobProvider : BlobProviderBase, ITransientDependency
         return ExistsAsync(filePath);
     }
 
-    public override async Task<(Stream, string)> GetOrNullAsync(BlobProviderGetArgs args)
+    public override async Task<Stream> GetOrNullAsync(BlobProviderGetArgs args)
     {
         var filePath = FilePathCalculator.Calculate(args);
 
         if (!File.Exists(filePath))
         {
-            return (null, null);
+            return null;
         }
 
-        return (await Policy.Handle<IOException>()
+        return await Policy.Handle<IOException>()
             .WaitAndRetryAsync(2, retryCount => TimeSpan.FromSeconds(retryCount))
             .ExecuteAsync(async () =>
             {
@@ -75,7 +75,13 @@ public class FileSystemBlobProvider : BlobProviderBase, ITransientDependency
                 {
                     return await TryCopyToMemoryStreamAsync(fileStream, args.CancellationToken);
                 }
-            }), filePath);
+            });
+    }
+
+    public override Task<string> GetUriAsync(BlobProviderGetArgs args)
+    {
+        var filePath = FilePathCalculator.Calculate(args);
+        return Task.FromResult(filePath);
     }
 
     protected virtual Task<bool> ExistsAsync(string filePath)

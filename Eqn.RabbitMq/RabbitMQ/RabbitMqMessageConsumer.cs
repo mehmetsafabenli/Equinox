@@ -21,7 +21,7 @@ public class RabbitMqMessageConsumer : IRabbitMqMessageConsumer, ITransientDepen
 
     protected IExceptionNotifier ExceptionNotifier { get; }
 
-    protected EqnAsyncTimer Timer { get; }
+    protected  EqnAsyncTimer Timer { get; }
 
     protected ExchangeDeclareConfiguration Exchange { get; private set; }
 
@@ -39,7 +39,7 @@ public class RabbitMqMessageConsumer : IRabbitMqMessageConsumer, ITransientDepen
 
     public RabbitMqMessageConsumer(
         IConnectionPool connectionPool,
-        EqnAsyncTimer timer,
+         EqnAsyncTimer timer,
         IExceptionNotifier exceptionNotifier)
     {
         ConnectionPool = connectionPool;
@@ -110,7 +110,7 @@ public class RabbitMqMessageConsumer : IRabbitMqMessageConsumer, ITransientDepen
                                 );
                                 break;
                             default:
-                                throw new EqnException($"Unknown {nameof(QueueBindType)}: {command.Type}");
+                                throw new  EqnException($"Unknown {nameof(QueueBindType)}: {command.Type}");
                         }
 
                         QueueBindCommands.TryDequeue(out command);
@@ -130,11 +130,98 @@ public class RabbitMqMessageConsumer : IRabbitMqMessageConsumer, ITransientDepen
         Callbacks.Add(callback);
     }
 
-    protected virtual async Task Timer_Elapsed(EqnAsyncTimer timer)
+    protected virtual async Task Timer_Elapsed( EqnAsyncTimer timer)
     {
         if (Channel == null || Channel.IsOpen == false)
         {
+            await TryCreateChannelAsync();
             await TrySendQueueBindCommandsAsync();
+        }
+    }
+
+    protected virtual async Task TryCreateChannelAsync()
+    {
+        await DisposeChannelAsync();
+
+        try
+        {
+            Channel = ConnectionPool
+                .Get(ConnectionName)
+                .CreateModel();
+
+            Channel.ExchangeDeclare(
+                exchange: Exchange.ExchangeName,
+                type: Exchange.Type,
+                durable: Exchange.Durable,
+                autoDelete: Exchange.AutoDelete,
+                arguments: Exchange.Arguments
+            );
+
+            Channel.QueueDeclare(
+                queue: Queue.QueueName,
+                durable: Queue.Durable,
+                exclusive: Queue.Exclusive,
+                autoDelete: Queue.AutoDelete,
+                arguments: Queue.Arguments
+            );
+
+            if (Queue.PrefetchCount.HasValue)
+            {
+                Channel.BasicQos(0, Queue.PrefetchCount.Value, false);
+            }
+            
+        }
+        catch (Exception ex)
+        {
+            Logger.LogException(ex, LogLevel.Warning);
+            await ExceptionNotifier.NotifyAsync(ex, logLevel: LogLevel.Warning);
+        }
+    }
+
+    protected virtual async Task HandleIncomingMessageAsync(object sender, BasicDeliverEventArgs basicDeliverEventArgs)
+    {
+        try
+        {
+            foreach (var callback in Callbacks)
+            {
+                await callback(Channel, basicDeliverEventArgs);
+            }
+
+            Channel.BasicAck(basicDeliverEventArgs.DeliveryTag, multiple: false);
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                Channel.BasicNack(
+                    basicDeliverEventArgs.DeliveryTag,
+                    multiple: false,
+                    requeue: true
+                );
+            }
+            // ReSharper disable once EmptyGeneralCatchClause
+            catch { }
+
+            Logger.LogException(ex);
+            await ExceptionNotifier.NotifyAsync(ex);
+        }
+    }
+
+    protected virtual async Task DisposeChannelAsync()
+    {
+        if (Channel == null)
+        {
+            return;
+        }
+
+        try
+        {
+            Channel.Dispose();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogException(ex, LogLevel.Warning);
+            await ExceptionNotifier.NotifyAsync(ex, logLevel: LogLevel.Warning);
         }
     }
 
